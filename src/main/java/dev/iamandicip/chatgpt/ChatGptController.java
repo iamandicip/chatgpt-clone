@@ -5,7 +5,7 @@ import io.github.wimdeblauwe.htmx.spring.boot.mvc.HxRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
-import org.springframework.ai.chat.memory.InMemoryChatMemory;
+import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.CrossOrigin;
@@ -20,9 +20,10 @@ public class ChatGptController {
 
     private final ChatClient chatClient;
 
-    public ChatGptController(ChatClient.Builder builder) {
+    public ChatGptController(ChatClient.Builder builder, ChatMemory chatMemory) {
         this.chatClient = builder
-                .defaultAdvisors(new MessageChatMemoryAdvisor(new InMemoryChatMemory()))
+                .defaultAdvisors(MessageChatMemoryAdvisor.builder(chatMemory)
+                        .build())
                 .build();
     }
 
