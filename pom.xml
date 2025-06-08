@@ -43,11 +43,6 @@
             <!--            <version>3.3.0</version>-->
         </dependency>
         <dependency>
-            <groupId>io.github.wimdeblauwe</groupId>
-            <artifactId>htmx-spring-boot-thymeleaf</artifactId>
-            <version>4.0.1</version>
-        </dependency>
-        <dependency>
             <groupId>org.springframework.ai</groupId>
             <artifactId>spring-ai-starter-model-mistral-ai</artifactId>
         </dependency>

@@ -1,8 +1,5 @@
 package dev.iamandicip.chatgpt;
 
-import org.springframework.web.servlet.view.FragmentsRendering;
-import org.springframework.web.servlet.View;
-import io.github.wimdeblauwe.htmx.spring.boot.mvc.HxRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
@@ -13,6 +10,8 @@ import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.servlet.View;
+import org.springframework.web.servlet.view.FragmentsRendering;
 
 @Controller
 @CrossOrigin
@@ -33,7 +32,6 @@ public class ChatGptController {
         return "index";
     }
 
-    @HxRequest
     @PostMapping("/api/chat")
     public View generate(@RequestParam String message, Model model) {
         log.debug("User message: {}", message);
