@@ -1,26 +1,27 @@
 package dev.iamandicip.chatgpt;
 
-import io.github.wimdeblauwe.htmx.spring.boot.mvc.HtmxResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.client.advisor.api.Advisor;
 import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.ui.Model;
+import org.springframework.web.servlet.View;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
-import org.springframework.ai.chat.client.advisor.api.Advisor;
-import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
 @ExtendWith(MockitoExtension.class)
 class ChatGptControllerTest {
@@ -50,7 +51,7 @@ class ChatGptControllerTest {
     void setUp() {
         when(chatClientBuilder.defaultAdvisors(any(Advisor.class))).thenReturn(chatClientBuilder);
         when(chatClientBuilder.build()).thenReturn(chatClient);
-        
+
         controller = new ChatGptController(chatClientBuilder, chatMemory);
         mockMvc = MockMvcBuilders.standaloneSetup(controller).build();
     }
@@ -78,7 +79,7 @@ class ChatGptControllerTest {
         when(chatClientRequestSpec.call()).thenReturn(callResponseSpec);
         when(callResponseSpec.content()).thenReturn(mockResponse);
 
-        HtmxResponse result = controller.generate(testMessage, model);
+        View result = controller.generate(testMessage, model);
 
         assertNotNull(result);
         verify(model).addAttribute("response", mockResponse);
@@ -99,7 +100,7 @@ class ChatGptControllerTest {
         when(chatClientRequestSpec.call()).thenReturn(callResponseSpec);
         when(callResponseSpec.content()).thenReturn(mockResponse);
 
-        HtmxResponse result = controller.generate(testMessage, model);
+        View result = controller.generate(testMessage, model);
 
         assertNotNull(result);
         verify(model).addAttribute("response", mockResponse);

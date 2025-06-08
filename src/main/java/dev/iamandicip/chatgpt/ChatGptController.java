@@ -1,6 +1,7 @@
 package dev.iamandicip.chatgpt;
 
-import io.github.wimdeblauwe.htmx.spring.boot.mvc.HtmxResponse;
+import org.springframework.web.servlet.view.FragmentsRendering;
+import org.springframework.web.servlet.View;
 import io.github.wimdeblauwe.htmx.spring.boot.mvc.HxRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
@@ -34,7 +35,7 @@ public class ChatGptController {
 
     @HxRequest
     @PostMapping("/api/chat")
-    public HtmxResponse generate(@RequestParam String message, Model model) {
+    public View generate(@RequestParam String message, Model model) {
         log.debug("User message: {}", message);
 
         String response = chatClient.prompt()
@@ -45,9 +46,9 @@ public class ChatGptController {
         model.addAttribute("response", response);
         model.addAttribute("message", message);
 
-        return HtmxResponse.builder()
-                .view("response :: responseFragment")
-                .view("recent-message-list :: messageFragment")
+        return FragmentsRendering
+                .with("response :: responseFragment")
+                .fragment("recent-message-list :: messageFragment")
                 .build();
     }
 }
