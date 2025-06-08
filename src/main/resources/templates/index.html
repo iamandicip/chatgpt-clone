@@ -10,6 +10,7 @@
             integrity="sha384-ujb1lZYygJmzgSwoxRggbCHcjc0rB2XoQrxeTUQyRjrOnlCoYta87iKBWq3EsdM2"
             src="https://unpkg.com/htmx.org@1.9.12"></script>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 </head>
 <body class="h-screen bg-gray-100">
 <div class="flex h-full">
@@ -24,17 +25,22 @@
     <main class="flex flex-col bg-white p-4 w-full max-w-full">
         <div class="flex-1 mb-4 p-4 h-full overflow-auto" id="response-container">
         </div>
-        <div class="">
+        <div class="" x-data="chatForm()">
             <form class="w-full"
                   hx-on="htmx:afterRequest: document.getElementById('message').value = '';"
                   hx-post="/api/chat"
                   hx-swap="beforeend"
                   hx-target="#response-container"
-                  id="chatForm">
+                  id="chatForm"
+                  x-ref="form">
                 <div class="flex items-center bg-gray-200 rounded-full p-2 shadow-md">
-                    <input class="bg-gray-200 outline-none text-gray-700 rounded-full py-2 px-4 w-full" id="message"
-                           name="message" placeholder="Message ChatGPT Clone"
-                           type="text">
+                    <input class="bg-gray-200 outline-none text-gray-700 rounded-full py-2 px-4 w-full" 
+                           id="message"
+                           name="message" 
+                           placeholder="Message ChatGPT Clone"
+                           type="text"
+                           x-ref="messageInput"
+                           @keydown.enter.prevent="handleEnterKey($event)">
                     <button class="bg-gray-300 hover:bg-gray-400 text-gray-600 rounded-full p-2 ml-2" type="submit">
                         <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"
                              xmlns="http://www.w3.org/2000/svg">
@@ -47,4 +53,17 @@
         </div>
     </main>
 </div>
+
+<script>
+    function chatForm() {
+        return {
+            handleEnterKey(event) {
+                // Only submit if Shift is not pressed and there's content
+                if (!event.shiftKey && this.$refs.messageInput.value.trim() !== '') {
+                    this.$refs.form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+                }
+            }
+        }
+    }
+</script>
 </body>
