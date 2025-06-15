@@ -33,7 +33,7 @@ public class ChatGptController {
     }
 
     @PostMapping("/api/chat")
-    public View generate(@RequestParam String message, Model model) {
+    public View generate(@RequestParam String message, @RequestParam String thinkingId, Model model) {
         log.debug("User message: {}", message);
 
         String response = chatClient.prompt()
@@ -43,6 +43,7 @@ public class ChatGptController {
 
         model.addAttribute("response", response);
         model.addAttribute("message", message);
+        model.addAttribute("thinkingId", thinkingId);
 
         return FragmentsRendering
                 .with("response :: responseFragment")

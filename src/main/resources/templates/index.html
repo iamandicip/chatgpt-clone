@@ -27,21 +27,27 @@
         </div>
         <div class="" x-data="chatForm()">
             <form class="w-full"
-                  hx-on="htmx:afterRequest: document.getElementById('message').value = '';"
+                  hx-on="htmx:afterRequest: handleAfterRequest(event)"
                   hx-post="/api/chat"
-                  hx-swap="beforeend"
-                  hx-target="#response-container"
+                  hx-swap="none"
+                  hx-target="this"
                   id="chatForm"
                   x-ref="form">
+                <input type="hidden" name="message" x-ref="hiddenMessage">
+                <input type="hidden" name="thinkingId" x-ref="hiddenThinkingId">
                 <div class="flex items-center bg-gray-200 rounded-full p-2 shadow-md">
                     <input class="bg-gray-200 outline-none text-gray-700 rounded-full py-2 px-4 w-full" 
                            id="message"
-                           name="message" 
+                           name="messageDisplay" 
                            placeholder="Message ChatGPT Clone"
                            type="text"
                            x-ref="messageInput"
                            @keydown.enter.prevent="handleEnterKey($event)">
-                    <button class="bg-gray-300 hover:bg-gray-400 text-gray-600 rounded-full p-2 ml-2" type="submit">
+                    <button class="bg-gray-300 hover:bg-gray-400 text-gray-600 rounded-full p-2 ml-2" 
+                            type="button"
+                            @click="submitMessage()"
+                            :disabled="isSubmitting"
+                            :class="{ 'opacity-50 cursor-not-allowed': isSubmitting }">
                         <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"
                              xmlns="http://www.w3.org/2000/svg">
                             <path d="M5 10l7-7m0 0l7 7m-7-7v18" stroke-linecap="round" stroke-linejoin="round"
@@ -57,12 +63,96 @@
 <script>
     function chatForm() {
         return {
+            isSubmitting: false,
+            currentThinkingId: null,
+            
             handleEnterKey(event) {
                 // Only submit if Shift is not pressed and there's content
-                if (!event.shiftKey && this.$refs.messageInput.value.trim() !== '') {
-                    this.$refs.form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+                if (!event.shiftKey && this.$refs.messageInput.value.trim() !== '' && !this.isSubmitting) {
+                    this.submitMessage();
                 }
+            },
+            
+            submitMessage() {
+                const message = this.$refs.messageInput.value.trim();
+                if (message === '' || this.isSubmitting) return;
+                
+                this.isSubmitting = true;
+                
+                // Generate unique ID for this interaction
+                this.currentThinkingId = 'thinking-' + Date.now();
+                
+                // Set the hidden input values for form submission
+                this.$refs.hiddenMessage.value = message;
+                this.$refs.hiddenThinkingId.value = this.currentThinkingId;
+                
+                // Instantly add user message and thinking indicator
+                const responseContainer = document.getElementById('response-container');
+                const messageElement = document.createElement('div');
+                messageElement.className = 'mb-8';
+                messageElement.innerHTML = `
+                    <div class="inline-block bg-slate-100 rounded-lg p-2 ml-auto">${this.escapeHtml(message)}</div>
+                `;
+                responseContainer.appendChild(messageElement);
+                
+                // Add separate thinking indicator that can be replaced independently
+                const thinkingElement = document.createElement('div');
+                thinkingElement.id = this.currentThinkingId;
+                thinkingElement.className = 'mt-4 text-gray-500 italic';
+                thinkingElement.textContent = 'Thinking...';
+                messageElement.appendChild(thinkingElement);
+                
+                // Scroll to bottom
+                responseContainer.scrollTop = responseContainer.scrollHeight;
+                
+                // Clear visible input immediately
+                this.$refs.messageInput.value = '';
+                
+                // Submit the form
+                this.$refs.form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+                
+                // Fallback timeout to reset state if HTMX events don't fire
+                setTimeout(() => {
+                    if (this.isSubmitting) {
+                        this.isSubmitting = false;
+                    }
+                }, 10000); // 10 second timeout
+            },
+            
+            
+            handleAfterRequest(event) {
+                this.isSubmitting = false;
+                
+                // Scroll to bottom after response
+                const responseContainer = document.getElementById('response-container');
+                responseContainer.scrollTop = responseContainer.scrollHeight;
+                
+                // Clear the hidden inputs and reset state
+                this.$refs.hiddenMessage.value = '';
+                this.$refs.hiddenThinkingId.value = '';
+                this.currentThinkingId = null;
+            },
+            
+            escapeHtml(text) {
+                const map = {
+                    '&': '&amp;',
+                    '<': '&lt;',
+                    '>': '&gt;',
+                    '"': '&quot;',
+                    "'": '&#039;'
+                };
+                return text.replace(/[&<>"']/g, function(m) { return map[m]; });
             }
+        }
+    }
+    
+    // Global function for HTMX events
+    function handleAfterRequest(event) {
+        // Get the Alpine.js component instance
+        const form = event.target;
+        const alpineComponent = Alpine.$data(form.closest('[x-data]'));
+        if (alpineComponent && alpineComponent.handleAfterRequest) {
+            alpineComponent.handleAfterRequest(event);
         }
     }
 </script>

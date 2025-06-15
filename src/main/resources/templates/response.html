@@ -7,8 +7,7 @@
     <meta content="ie=edge" http-equiv="X-UA-Compatible">
 </head>
 <body>
-<div class="mb-8" th:fragment="responseFragment">
-    <div class="inline-block bg-slate-100 rounded-lg p-2 ml-auto" th:text="${message}">Message</div>
+<div th:fragment="responseFragment" th:id="${thinkingId}" hx-swap-oob="true">
     <p class="mt-4 h-full overflow-auto" th:text="${response}">Response</p>
 </div>
 </body>

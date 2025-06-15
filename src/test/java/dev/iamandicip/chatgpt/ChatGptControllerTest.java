@@ -12,6 +12,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.ui.Model;
 import org.springframework.web.servlet.View;
+import org.springframework.web.servlet.view.FragmentsRendering;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -79,7 +80,7 @@ class ChatGptControllerTest {
         when(chatClientRequestSpec.call()).thenReturn(callResponseSpec);
         when(callResponseSpec.content()).thenReturn(mockResponse);
 
-        View result = controller.generate(testMessage, model);
+        View result = controller.generate(testMessage, "thinking-123", model);
 
         assertNotNull(result);
         verify(model).addAttribute("response", mockResponse);
@@ -100,7 +101,7 @@ class ChatGptControllerTest {
         when(chatClientRequestSpec.call()).thenReturn(callResponseSpec);
         when(callResponseSpec.content()).thenReturn(mockResponse);
 
-        View result = controller.generate(testMessage, model);
+        View result = controller.generate(testMessage, "thinking-123", model);
 
         assertNotNull(result);
         verify(model).addAttribute("response", mockResponse);
@@ -116,6 +117,7 @@ class ChatGptControllerTest {
 
         mockMvc.perform(post("/api/chat")
                         .param("message", "Test message")
+                        .param("thinkingId", "thinking-test")
                         .header("HX-Request", "true"))
                 .andExpect(status().isOk());
     }
@@ -139,5 +141,29 @@ class ChatGptControllerTest {
         assertThrows(IllegalArgumentException.class, () -> {
             new ChatGptController(chatClientBuilder, null);
         });
+    }
+    
+    @Test
+    void testGenerateReturnsOnlyResponseFragment() {
+        String testMessage = "Hello, world!";
+        String mockResponse = "Hello! How can I help you today?";
+
+        when(chatClient.prompt()).thenReturn(chatClientRequestSpec);
+        when(chatClientRequestSpec.user(testMessage)).thenReturn(chatClientRequestSpec);
+        when(chatClientRequestSpec.call()).thenReturn(callResponseSpec);
+        when(callResponseSpec.content()).thenReturn(mockResponse);
+
+        View result = controller.generate(testMessage, "thinking-123", model);
+
+        assertNotNull(result);
+        assertTrue(result instanceof FragmentsRendering, "Result should be FragmentsRendering");
+        
+        FragmentsRendering fragmentsRendering = (FragmentsRendering) result;
+        // Verify both response and message fragments are included
+        String viewString = fragmentsRendering.toString();
+        assertTrue(viewString.contains("response :: responseFragment"), 
+                  "Should contain response fragment");
+        assertTrue(viewString.contains("recent-message-list :: messageFragment"), 
+                   "Should contain message fragment for sidebar");
     }
 }

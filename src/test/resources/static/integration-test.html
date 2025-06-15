@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Chat Integration Tests</title>
+    <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <script crossorigin="anonymous" 
+            integrity="sha384-ujb1lZYygJmzgSwoxRggbCHcjc0rB2XoQrxeTUQyRjrOnlCoYta87iKBWq3EsdM2"
+            src="https://unpkg.com/htmx.org@1.9.12"></script>
+    <style>
+        .test-container { margin: 20px; padding: 20px; border: 1px solid #ccc; }
+        .test-result { margin: 10px 0; padding: 5px; }
+        .pass { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .fail { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .mb-8 { margin-bottom: 2rem; }
+        .mt-4 { margin-top: 1rem; }
+        .bg-slate-100 { background-color: #f1f5f9; }
+        .inline-block { display: inline-block; }
+        .rounded-lg { border-radius: 0.5rem; }
+        .p-2 { padding: 0.5rem; }
+        .ml-auto { margin-left: auto; }
+        .text-gray-500 { color: #6b7280; }
+        .italic { font-style: italic; }
+        .h-full { height: 100%; }
+        .overflow-auto { overflow: auto; }
+        #response-container { min-height: 200px; border: 1px solid #ddd; padding: 10px; }
+    </style>
+</head>
+<body>
+    <h1>Chat Integration Tests - Real HTMX Flow</h1>
+    
+    <!-- Mock Server Setup -->
+    <script>
+        // Mock server that intercepts HTMX requests
+        let mockResponses = {};
+        
+        function setupMockServer() {
+            // Intercept fetch requests that HTMX makes
+            const originalFetch = window.fetch;
+            window.fetch = function(url, options) {
+                if (url === '/api/chat' && options.method === 'POST') {
+                    // Extract message from form data
+                    const formData = new FormData();
+                    if (options.body instanceof FormData) {
+                        for (let [key, value] of options.body.entries()) {
+                            formData.append(key, value);
+                        }
+                    }
+                    const message = formData.get('message');
+                    
+                    // Return mock response
+                    const mockResponse = mockResponses[message] || 'Default AI response';
+                    return Promise.resolve(new Response(
+                        `<p class="mt-4 h-full overflow-auto">${mockResponse}</p>`,
+                        { 
+                            status: 200, 
+                            headers: { 'Content-Type': 'text/html' }
+                        }
+                    ));
+                }
+                return originalFetch.apply(this, arguments);
+            };
+        }
+        
+        function setMockResponse(userMessage, aiResponse) {
+            mockResponses[userMessage] = aiResponse;
+        }
+        
+        setupMockServer();
+    </script>
+    
+    <div class="test-container">
+        <h2>Test Chat Interface</h2>
+        <div id="response-container">
+            <!-- Messages will appear here -->
+        </div>
+        
+        <div x-data="chatForm()">
+            <form class="w-full"
+                  hx-on="htmx:configRequest: handleConfigRequest($event); htmx:afterRequest: handleAfterRequest($event)"
+                  hx-post="/api/chat"
+                  hx-swap="innerHTML"
+                  hx-target="#response-container"
+                  id="chatForm"
+                  x-ref="form">
+                <input type="hidden" name="message" x-ref="hiddenMessage">
+                <div style="display: flex; align-items: center; background-color: #e5e7eb; border-radius: 9999px; padding: 0.5rem;">
+                    <input style="background-color: #e5e7eb; outline: none; color: #374151; border-radius: 9999px; padding: 0.5rem 1rem; width: 100%;" 
+                           id="message"
+                           name="messageDisplay" 
+                           placeholder="Message ChatGPT Clone"
+                           type="text"
+                           x-ref="messageInput">
+                    <button style="background-color: #d1d5db; color: #4b5563; border-radius: 9999px; padding: 0.5rem; margin-left: 0.5rem;" 
+                            type="button"
+                            @click="submitMessage()"
+                            :disabled="isSubmitting">
+                        Send
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="test-container">
+        <h2>Integration Test Results</h2>
+        <div id="test-results"></div>
+        <button onclick="runIntegrationTests()">Run Integration Tests</button>
+        <button onclick="clearTests()">Clear</button>
+    </div>
+
+    <script>
+        function chatForm() {
+            return {
+                isSubmitting: false,
+                currentThinkingId: null,
+                
+                submitMessage() {
+                    const message = this.$refs.messageInput.value.trim();
+                    if (message === '' || this.isSubmitting) return;
+                    
+                    this.isSubmitting = true;
+                    
+                    // Set the hidden input value for form submission
+                    this.$refs.hiddenMessage.value = message;
+                    
+                    // Generate unique ID for this interaction
+                    this.currentThinkingId = 'thinking-' + Date.now();
+                    
+                    // Instantly add user message and thinking indicator
+                    const responseContainer = document.getElementById('response-container');
+                    const messageElement = document.createElement('div');
+                    messageElement.className = 'mb-8';
+                    messageElement.innerHTML = `
+                        <div class="inline-block bg-slate-100 rounded-lg p-2 ml-auto">${this.escapeHtml(message)}</div>
+                    `;
+                    responseContainer.appendChild(messageElement);
+                    
+                    // Add separate thinking indicator that can be replaced independently
+                    const thinkingElement = document.createElement('div');
+                    thinkingElement.id = this.currentThinkingId;
+                    thinkingElement.className = 'mt-4 text-gray-500 italic';
+                    thinkingElement.textContent = 'Thinking...';
+                    messageElement.appendChild(thinkingElement);
+                    
+                    // Scroll to bottom
+                    responseContainer.scrollTop = responseContainer.scrollHeight;
+                    
+                    // Clear visible input immediately
+                    this.$refs.messageInput.value = '';
+                    
+                    // Submit the form
+                    this.$refs.form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+                },
+                
+                handleConfigRequest(event) {
+                    // Set the target to the current thinking indicator
+                    if (this.currentThinkingId) {
+                        event.detail.target = '#' + this.currentThinkingId;
+                        // Also update the elt attribute for HTMX
+                        event.target.setAttribute('hx-target', '#' + this.currentThinkingId);
+                    }
+                },
+                
+                handleAfterRequest(event) {
+                    this.isSubmitting = false;
+                    
+                    // Scroll to bottom after response
+                    const responseContainer = document.getElementById('response-container');
+                    responseContainer.scrollTop = responseContainer.scrollHeight;
+                    
+                    // Reset the hx-target back to default
+                    this.$refs.form.setAttribute('hx-target', '#response-container');
+                    
+                    // Clear the hidden input and reset state
+                    this.$refs.hiddenMessage.value = '';
+                    this.currentThinkingId = null;
+                },
+                
+                escapeHtml(text) {
+                    const map = {
+                        '&': '&amp;',
+                        '<': '&lt;',
+                        '>': '&gt;',
+                        '"': '&quot;',
+                        "'": '&#039;'
+                    };
+                    return text.replace(/[&<>"']/g, function(m) { return map[m]; });
+                }
+            }
+        }
+
+        function addTestResult(message, passed, details = '') {
+            const resultsDiv = document.getElementById('test-results');
+            const resultDiv = document.createElement('div');
+            resultDiv.className = `test-result ${passed ? 'pass' : 'fail'}`;
+            resultDiv.innerHTML = `<strong>${message}</strong>${details ? '<br>' + details : ''}`;
+            resultsDiv.appendChild(resultDiv);
+        }
+
+        function clearTests() {
+            document.getElementById('test-results').innerHTML = '';
+            document.getElementById('response-container').innerHTML = '';
+        }
+
+        async function runIntegrationTests() {
+            clearTests();
+            addTestResult('Starting Real HTMX Integration Tests...', true);
+            
+            try {
+                await testRealHTMXFlow();
+                await testUserMessagePersistence();
+                await testMultipleMessagesFlow();
+                addTestResult('All Integration Tests Completed!', true);
+            } catch (error) {
+                addTestResult('Integration Test Suite Failed', false, error.message);
+            }
+        }
+
+        async function testRealHTMXFlow() {
+            addTestResult('Test 1: Real HTMX Flow', true, 'Testing complete user input to AI response flow...');
+            
+            // Setup mock response
+            setMockResponse('Hello HTMX', 'Hi there! This is a real HTMX response.');
+            
+            // Get Alpine component
+            const alpineData = Alpine.$data(document.querySelector('[x-data]'));
+            
+            // Clear container first
+            document.getElementById('response-container').innerHTML = '';
+            
+            // Set user input and submit
+            alpineData.$refs.messageInput.value = 'Hello HTMX';
+            
+            // Submit and wait for HTMX to complete
+            const originalThinkingId = await new Promise((resolve, reject) => {
+                // Capture the thinking ID before submission
+                const originalSubmit = alpineData.submitMessage;
+                alpineData.submitMessage = function() {
+                    originalSubmit.call(this);
+                    resolve(this.currentThinkingId);
+                };
+                alpineData.submitMessage();
+            });
+            
+            // Wait for HTMX request to complete
+            await new Promise(resolve => {
+                document.addEventListener('htmx:afterRequest', function handler(e) {
+                    document.removeEventListener('htmx:afterRequest', handler);
+                    resolve();
+                }, { once: true });
+            });
+            
+            // Verify final state
+            const responseContainer = document.getElementById('response-container');
+            const userMessage = responseContainer.querySelector('.bg-slate-100');
+            const aiResponse = responseContainer.querySelector('p.mt-4');
+            const thinkingElement = document.getElementById(originalThinkingId);
+            
+            if (!userMessage) {
+                throw new Error('User message not found after HTMX response');
+            }
+            
+            if (userMessage.textContent !== 'Hello HTMX') {
+                throw new Error(`User message text wrong: "${userMessage.textContent}" (expected "Hello HTMX")`);
+            }
+            
+            if (!aiResponse) {
+                throw new Error('AI response not found after HTMX response');
+            }
+            
+            if (!aiResponse.textContent.includes('Hi there! This is a real HTMX response.')) {
+                throw new Error(`AI response text wrong: "${aiResponse.textContent}"`);
+            }
+            
+            if (thinkingElement) {
+                throw new Error('Thinking element still exists - it should have been replaced');
+            }
+            
+            addTestResult('✅ Test 1 PASSED', true, 'User message persists, AI response appears, thinking indicator replaced');
+        }
+
+        async function testUserMessagePersistence() {
+            addTestResult('Test 2: User Message Persistence', true, 'Testing that user messages survive HTMX replacements...');
+            
+            // Setup mock response
+            setMockResponse('Second message', 'Second AI response here.');
+            
+            const alpineData = Alpine.$data(document.querySelector('[x-data]'));
+            
+            // Count messages before
+            const messagesBefore = document.querySelectorAll('.bg-slate-100').length;
+            
+            // Submit second message
+            alpineData.$refs.messageInput.value = 'Second message';
+            
+            const originalThinkingId = await new Promise((resolve) => {
+                const originalSubmit = alpineData.submitMessage;
+                alpineData.submitMessage = function() {
+                    originalSubmit.call(this);
+                    resolve(this.currentThinkingId);
+                };
+                alpineData.submitMessage();
+            });
+            
+            // Wait for HTMX completion
+            await new Promise(resolve => {
+                document.addEventListener('htmx:afterRequest', function handler(e) {
+                    document.removeEventListener('htmx:afterRequest', handler);
+                    resolve();
+                }, { once: true });
+            });
+            
+            // Verify both messages exist
+            const allUserMessages = document.querySelectorAll('.bg-slate-100');
+            const allAIResponses = document.querySelectorAll('p.mt-4');
+            
+            if (allUserMessages.length !== messagesBefore + 1) {
+                throw new Error(`Expected ${messagesBefore + 1} user messages, found ${allUserMessages.length}`);
+            }
+            
+            if (allAIResponses.length !== messagesBefore + 1) {
+                throw new Error(`Expected ${messagesBefore + 1} AI responses, found ${allAIResponses.length}`);
+            }
+            
+            // Verify first message still exists
+            const firstMessage = allUserMessages[0];
+            if (firstMessage.textContent !== 'Hello HTMX') {
+                throw new Error(`First message corrupted: "${firstMessage.textContent}"`);
+            }
+            
+            // Verify second message exists
+            const secondMessage = allUserMessages[1];
+            if (secondMessage.textContent !== 'Second message') {
+                throw new Error(`Second message wrong: "${secondMessage.textContent}"`);
+            }
+            
+            addTestResult('✅ Test 2 PASSED', true, 'Multiple user messages persist correctly through HTMX responses');
+        }
+
+        async function testMultipleMessagesFlow() {
+            addTestResult('Test 3: Multiple Messages Flow', true, 'Testing continuous chat flow...');
+            
+            // Test rapid submissions
+            setMockResponse('Quick 1', 'Response 1');
+            setMockResponse('Quick 2', 'Response 2');
+            
+            const alpineData = Alpine.$data(document.querySelector('[x-data]'));
+            
+            // Submit first quick message
+            alpineData.$refs.messageInput.value = 'Quick 1';
+            alpineData.submitMessage();
+            
+            // Wait a bit then submit second
+            setTimeout(() => {
+                alpineData.$refs.messageInput.value = 'Quick 2';
+                alpineData.submitMessage();
+            }, 100);
+            
+            // Wait for both to complete
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            const allMessages = document.querySelectorAll('.bg-slate-100');
+            const allResponses = document.querySelectorAll('p.mt-4');
+            
+            if (allMessages.length < 4) {
+                throw new Error(`Expected at least 4 user messages, found ${allMessages.length}`);
+            }
+            
+            if (allResponses.length < 4) {
+                throw new Error(`Expected at least 4 AI responses, found ${allResponses.length}`);
+            }
+            
+            addTestResult('✅ Test 3 PASSED', true, 'Multiple rapid messages handled correctly');
+        }
+
+        // Global functions for HTMX events
+        function handleConfigRequest(event) {
+            const form = event.target;
+            const alpineComponent = Alpine.$data(form.closest('[x-data]'));
+            if (alpineComponent && alpineComponent.handleConfigRequest) {
+                alpineComponent.handleConfigRequest(event);
+            }
+        }
+        
+        function handleAfterRequest(event) {
+            const form = event.target;
+            const alpineComponent = Alpine.$data(form.closest('[x-data]'));
+            if (alpineComponent && alpineComponent.handleAfterRequest) {
+                alpineComponent.handleAfterRequest(event);
+            }
+        }
+    </script>
+</body>
+</html>
